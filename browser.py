@@ -2,6 +2,11 @@ import os
 import socket
 import ssl
 import urllib.parse
+import tkinter
+
+WIDTH, HEIGHT = 800, 600
+SCROLL_STEP = 100
+HSTEP, VSTEP = 13, 18
 
 
 class URL:
@@ -74,7 +79,52 @@ class URL:
         return content
 
 
-def show(body):
+class Browser:
+    def __init__(self):
+        self.window = tkinter.Tk()
+        self.canvas = tkinter.Canvas(
+            self.window,
+            width=WIDTH,
+            height=HEIGHT
+        )
+        self.canvas.pack()
+        self.scroll = 0
+        self.window.bind("<Down>", self.scrolldown)
+
+    def scrolldown(self, e):
+        self.scroll += SCROLL_STEP
+        self.draw()
+
+    def load(self, url):
+        body = url.request()
+        text = lex(body)
+        self.display_list = layout(text)
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        for x, y, c in self.display_list:
+            if y > self.scroll + HEIGHT:
+                continue
+            if y + VSTEP < self.scroll:
+                continue
+            self.canvas.create_text(x, y - self.scroll, text=c)
+
+
+def layout(text):
+    display_list = []
+    cursor_x, cursor_y = HSTEP, VSTEP
+    for c in text:
+        display_list.append((cursor_x, cursor_y, c))
+        cursor_x += HSTEP
+        if cursor_x > WIDTH - HSTEP:
+            cursor_y += VSTEP
+            cursor_x = HSTEP
+    return display_list
+
+
+def lex(body):
+    text = ""
     in_tag = False
     i = 0
     while i < len(body):
@@ -87,28 +137,30 @@ def show(body):
             i += 1
         elif not in_tag:
             if body.startswith('&lt', i):
-                print("<", end="")
+                text += "<"
                 i += 4
             elif body.startswith('&gt', i):
-                print(">", end="")
+                text += ">"
                 i += 4
             else:
-                print(c, end="")
+                text += c
                 i += 1
         else:
             i += 1
+    return text
 
 
 def load(url: URL):
     body = url.request()
-    show(body)
+    lex(body)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     import sys
 
     default_file = "/temp/test.html"
     if len(sys.argv) > 1:
-        load(URL(sys.argv[1]))
+        Browser().load((URL(sys.argv[1])))
     else:
-        load(URL(f'file://{default_file}'))
+        Browser().load((URL(f'file://{default_file}')))
+    tkinter.mainloop()
